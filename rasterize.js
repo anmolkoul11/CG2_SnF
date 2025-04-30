@@ -4,11 +4,11 @@
 const INPUT_URL = "https://ncsucg4games.github.io/prog2/"; // location of input files
 const INPUT_TRIANGLES_URL = INPUT_URL + "triangles.json"; // triangles file loc
 const INPUT_SPHERES_URL = INPUT_URL + "spheres.json"; // spheres file loc
-const ALTERNATE_ROOMS_URL = "https://anmolkoul11.github.io/CG2_prog2/rooms.json";
+const ALTERNATE_ROOMS_URL = "https://anmolkoul11.github.io/CG2_SnF/rooms.json";
 const INPUT_ROOMS_URL = INPUT_URL + "rooms.json";
 const CELL_SIZE = 1.0;
 const CELL_HEIGHT = 1.0;
-const FPS_UPDATE_INTERVAL = 500; // Update FPS every 500ms
+const FPS_UPDATE_INTERVAL = 10; // Update FPS every 500ms
 const MAX_FPS = 240; // Cap FPS display at 240
 const ROOM_TYPES = {
     SOLID: "s",
@@ -41,7 +41,7 @@ window.DEBUG = {
 
 const ROOM_TEXTURES = {
     WALL: "rocktile.jpg",
-    WALL_ALT: "https://anmolkoul11.github.io/CG2_prog2/Walltile.png",
+    WALL_ALT: "https://anmolkoul11.github.io/CG2_SnF/Walltile.png",
     FLOOR: "floor.jpg",
     CEILING: "sky.jpg"
 };
@@ -51,19 +51,25 @@ const PROJECTILE = {
     INITIAL_SPEED: 5.9,   // Initial launch speed
     LIFETIME: 10000,      // 10 second lifetime
     COLOR: [1, 0, 0, 1],  // Red color
-    GRAVITY: -3.9,      // Reduced gravity for more natural arc
+    GRAVITY: -3.9,      // gravity for more natural arc
     FRICTION: 0.98,       // Air resistance
     BOUNCE: 0.9,          // Lose 50% energy on bounce
     MIN_SPEED: 0.1,      // Minimum speed before coming to rest
-    GROUND_FRICTION: 0.9  // Extra friction when hitting ground
+    GROUND_FRICTION: 0.9,  // Extra friction when hitting ground
+    TEXTURE_URL: "projectile2.jpg",  // Add your texture URL
 };
 
 const HAND_SPRITE = {
-    WIDTH: 0.8,         // Adjusted width
-    HEIGHT: 1.0,        // Adjusted height
-    BOB_AMOUNT: 0.02,   // Slightly increased bob amount
-    BOB_SPEED: 8,       // Same speed
+    WIDTH: 0.8,         // Hand width
+    HEIGHT: 1.0,        // height
+    BOB_AMOUNT: 0.02,   // bob amount
+    BOB_SPEED: 8,       // Bob speed
     TEXTURE_URL: "hand2.png"
+};
+
+const PARTICLE_TYPES = {
+    SMOKE: 'smoke',
+    LIQUID: 'liquid'
 };
 
 // Add with other global variables
@@ -71,6 +77,7 @@ let projectiles = [];
 let showPerfStats = false; // Flag to show performance stats
 let handSprite = null; // Hand sprite object
 let initialClick = 0;
+let currentProjectileType = PARTICLE_TYPES.SMOKE;
 
 const ROOM_MATERIAL = {
     ambient: [0.3, 0.3, 0.3],
@@ -105,55 +112,52 @@ const HAND_ANIMATION = {
 };
 
 const AUDIO = {
-    FOOTSTEPS: 'https://anmolkoul11.github.io/CG2_prog2/steps.flac',
-    COLLISION: 'https://anmolkoul11.github.io/CG2_prog2/grunt.wav',
-    COLLISION_PROJECTILE: 'collision_projectile.wav'
+    FOOTSTEPS: 'https://anmolkoul11.github.io/CG2_SnF/steps.flac',
+    COLLISION: 'https://anmolkoul11.github.io/CG2_SnF/grunt.wav',
+    COLLISION_PROJECTILE: 'https://anmolkoul11.github.io/CG2_SnF/collision_projectile.wav'
 };
 
-const PARTICLE_TYPES = {
-    SMOKE: 'smoke',
-    LIQUID: 'liquid'
-};
+
 
 const PARTICLE_TEXTURES = {
     SMOKE: {
-        URL: "smoke2.png", 
+        URL: "https://anmolkoul11.github.io/CG2_SnF/smoke2.png", 
         SIZE: 256
     },
     LIQUID: {
-        URL: "fire.png",
+        URL: "https://anmolkoul11.github.io/CG2_SnF/liquid_5122.png",
         SIZE: 256
     }
 };
 
-// Define separate behaviors for each type
+
 const PARTICLE_CONFIGS = {
     [PARTICLE_TYPES.SMOKE]: {
-        maxParticles: 25,
-        lifetime: 15000,
-        startSize: 0.001,
-        endSize: 0.1,
+        maxParticles: 35,
+        lifetime: 10000,
+        startSize: 0.1,
+        endSize: 0.3,
         startOpacity: 0.6,
         endOpacity: 0,
         startColor: [0.1, 0.1, 0.1],
         endColor: [0.1, 0.1, 0.1],
         
-        // Add initial velocity range
+
         initialVelocityRange: {
-            x: [-0.1, 0.1],    // Random x velocity between -0.1 and 0.1
+            x: [-0.1, 0.3],    // Random x velocity between -0.1 and 0.1
             y: [0.2, 0.5],     // Upward velocity between 0.2 and 0.5
             z: [-0.1, 0.1]     // Random z velocity between -0.1 and 0.1
         },
         
-        // Rest of the config remains the same...
+
         burst: {
             speed: 0.7,
-            spread: 0.5,
-            angle: Math.PI / 3
+            spread: 0.7,
+            angle: Math.PI / 5
         },
         physics: {
-            buoyancy: 0.015,
-            drag: 0.98,
+            buoyancy: 0.019,
+            drag: 0.97,
             mass: 1.2,
             gravity: -0.0005
         },
@@ -164,30 +168,47 @@ const PARTICLE_CONFIGS = {
             persistence: 0.5
         },
         swirl: {
-            amplitude: 0.001,
+            amplitude: 0.005,
             frequency: 0.8,
-            radius: 0.2,
+            radius: 0.4,
             decay: 0.98
         },
         expansion: {
             rate: 2.1,
-            maxRadius: 2.5,
-            curve: 0.5
+            maxRadius: 3.9,
+            curve: 0.7
         }
     },
     [PARTICLE_TYPES.LIQUID]: {
-        maxParticles: 15,
-        lifetime: 1000,    // milliseconds
-        startSize: 0.03,
-        endSize: 0.01,    // Liquid particles shrink
-        startOpacity: 0.9,
-        endOpacity: 0,
-        startColor: [0.2, 0.5, 1.0],  // Blue
-        endColor: [0.3, 0.6, 1.0],
-        verticalForce: -1.0, // Downward force
-        spread: 0.3,         // Tighter spread
-        viscosity: 0.8,      // Resistance to movement
-        surfaceTension: 0.5  // Particle attraction
+        // splash size 
+        maxParticles : 40,          // for 15 → a visible puddle
+        lifetime     : 6000,        // ms
+    
+        // visual sizes / opacity 
+        startSize    : 0.01,
+        endSize      : 0.02,
+        startOpacity : 0.6,
+        endOpacity   : 0.0,
+        startColor   : [0.25, 0.55, 1.0],   // blue-ish tint... which supposedly is not properly working...
+    
+        // launch velocity ranges (we add our own later)
+        initialVelocityRange : {
+            rMin : 0.4,  rMax : 1.5,   // horizontal speed
+            yMin : 1.0,  yMax : 1.0    // upward speed
+        },
+    
+        // physics 
+        physics : {
+            gravity : -1.5,
+            drag    : 0.90,           // strong horizontal friction
+            vCutoff : 0.3             // stop moving when below this speed
+        },
+        initialVelocityRange: {
+            rMin: 0.3,        // Reduced horizontal spread
+            rMax: 1.2,
+            yMin: 0.5,        // Lower upward velocity
+            yMax: 1.0
+        }
     }
 };
 
@@ -205,7 +226,7 @@ let showMinimap = false;
 
 /* input model data */
 var gl = null; // the all powerful gl object. It's all here folks!
-var shaderProgram; // Add this line with other global variables
+var shaderProgram; 
 var vPosAttribLoc;
 var vNormAttribLoc;
 var inputTriangles = []; // the triangle data as loaded from input files
@@ -303,7 +324,7 @@ function setupMinimap() {
 function checkParticleCollision(particle, trialPos) {
     const BUFFER = 0.02;                         // safety gap
 
-    /* ---------- floor / ceiling ---------- */
+    // floor / ceiling
     if (trialPos[1] < BUFFER) {
         return {
             hit   : true,
@@ -319,7 +340,7 @@ function checkParticleCollision(particle, trialPos) {
         };
     }
 
-    /* ---------- solid rooms ---------- */
+    // solid rooms 
     for (const room of inputRooms) if (room.type === ROOM_TYPES.SOLID) {
 
         // quick AABB test
@@ -330,7 +351,7 @@ function checkParticleCollision(particle, trialPos) {
             trialPos[2] < room.bounds.min[2] - BUFFER ||
             trialPos[2] > room.bounds.max[2] + BUFFER)  continue;
 
-        /* ---- inside or intersecting: clamp to box ---- */
+        //  inside or intersecting: clamp to box
         const closest = vec3.fromValues(
             Math.max(room.bounds.min[0], Math.min(trialPos[0], room.bounds.max[0])),
             Math.max(room.bounds.min[1], Math.min(trialPos[1], room.bounds.max[1])),
@@ -341,14 +362,14 @@ function checkParticleCollision(particle, trialPos) {
         const pen = vec3.subtract(vec3.create(), trialPos, closest);
         if (vec3.squaredLength(pen) === 0) continue;      // rare edge case
 
-        /* pick axis of maximum penetration as the collision normal */
+        // pick axis of maximum penetration as the collision normal
         let nx = Math.abs(pen[0]), ny = Math.abs(pen[1]), nz = Math.abs(pen[2]);
         let normal = vec3.create();
         if (nx > ny && nx > nz) vec3.set(normal, Math.sign(pen[0]), 0, 0);
         else if (ny > nz)        vec3.set(normal, 0, Math.sign(pen[1]), 0);
         else                     vec3.set(normal, 0, 0, Math.sign(pen[2]));
 
-        /* surface point offset by BUFFER so we stay outside next frame */
+        // surface point offset by BUFFER so we stay outside next frame
         const point = vec3.scaleAndAdd(vec3.create(),
                         closest, normal, BUFFER);
 
@@ -358,7 +379,28 @@ function checkParticleCollision(particle, trialPos) {
     return { hit: false, normal: vec3.create(), point: vec3.create() };
 }
 
-
+function displayProjectileType() {
+    // Create or update projectile type indicator
+    let indicator = document.getElementById('projectileType');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'projectileType';
+        indicator.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            border-radius: 5px;
+        `;
+        document.body.appendChild(indicator);
+    }
+    
+    const type = currentProjectileType === PARTICLE_TYPES.SMOKE ? 'SMOKE' : 'LIQUID';
+    indicator.textContent = `P: ${type}`;
+}
 
 function calculateReflection(velocity, normal) {
     const reflection = vec3.create();
@@ -457,7 +499,7 @@ function stopSound(soundName) {
 }
 
 function createHandSprite() {
-    // Create a simple quad for the hand sprite
+    // Creating a simple quad for the hand sprite
     const handVertices = new Float32Array([
         -HAND_SPRITE.WIDTH/2, -HAND_SPRITE.HEIGHT/2, 0.0,
          HAND_SPRITE.WIDTH/2, -HAND_SPRITE.HEIGHT/2, 0.0,
@@ -483,7 +525,6 @@ function createHandSprite() {
         indexBuffer: gl.createBuffer(),
         bobOffset: 0,
         lastBobTime: performance.now(),
-        // Add these animation properties
         animationState: HAND_ANIMATION.IDLE,
         animationTime: 0,
         throwOffset: 0
@@ -518,14 +559,14 @@ function createHandSprite() {
 
     image.onload = () => {
         gl.bindTexture(gl.TEXTURE_2D, handSprite.texture);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); // Add this line
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); 
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
         gl.generateMipmap(gl.TEXTURE_2D);
         console.log("Hand texture loaded successfully");
     };
     image.onerror = () => {
-        console.error("Error loading hand texture");  // Debug message
+        console.error("Error loading hand texture"); //debug
     };
     image.src = HAND_SPRITE.TEXTURE_URL;
 
@@ -637,7 +678,7 @@ function renderHandSprite(handSprite) {
 }
 
 function setupParticleShaders() {
-    // In setupParticleShaders():
+    
 const particleVShaderCode = `
 attribute vec3 aPosition;
 attribute vec4 aColor;
@@ -645,10 +686,11 @@ attribute vec2 aSize;
 attribute float aLifetime;
 attribute vec3 aVelocity;
 attribute vec2 aTexCoord;
+attribute float aFlatten;
+attribute float aTilt;   
 
 uniform mat4 uProjectionView;
 uniform vec3 uEyePosition;
-uniform float uTime;
 
 varying vec4 vColor;
 varying vec2 vUV;
@@ -657,41 +699,91 @@ varying float vLifetime;
 void main() {
         vColor = aColor;
         vLifetime = aLifetime;
-        // Fix UV coordinates
-        vUV = vec2(aTexCoord.x, aTexCoord.y); // Flip both U and V
+        
+        //vUV = vec2(-aTexCoord.x, -aTexCoord.y); // Flip both U and V
+        vUV    = aTexCoord;
 
-        // Billboard calculation
-        vec3 toEye = normalize(uEyePosition - aPosition);
-        vec3 right = normalize(cross(vec3(0, 1, 0), toEye));
-        vec3 up = cross(toEye, right);
-        
-        float size = mix(aSize.x, aSize.y, aLifetime);
-        
-        vec3 pos = aPosition + 
-                   right * (aTexCoord.x - 0.5) * size + 
-                   up * (aTexCoord.y - 0.5) * size;
-                   
-        gl_Position = uProjectionView * vec4(pos, 1.0);
+         float size = mix(aSize.x, aSize.y, aLifetime);   // current quad size
+         
+
+           
+            vec3 toEye = normalize(uEyePosition - aPosition);
+            vec3 camR  = normalize(cross(vec3(0.0,1.0,0.0), toEye));
+            vec3 camU  = cross(toEye, camR);
+
+            
+            vec3 flatR = vec3( size, 0.0, 0.0 );   // world-X
+            vec3 flatU = vec3( 0.0, 0.0, size );   // world-Z
+
+            float c = cos(aTilt), s = sin(aTilt);
+            vec3 camRsz = camR * size;          // already scaled — keep as-is
+            vec3 camUsz = camU * size;
+            vec3 camNsz = -toEye * size;        // forward/back direction
+
+            
+            vec3 U_camTilt = camUsz * c + cross(camRsz, camUsz) * s;
+
+            
+            vec3 R_camTilt = camRsz;
+
+            
+            vec3 R_flatTilt = vec3( flatR.x,
+                                    flatR.y * c - flatR.z * s,
+                                    flatR.y * s + flatR.z * c );
+            vec3 U_flatTilt = vec3( flatU.x,
+                                    flatU.y * c - flatU.z * s,
+                                    flatU.y * s + flatU.z * c );
+
+                                  
+
+
+            
+            float base    = aFlatten * 2.5;                 // scale so bottom leads
+            float fLocal  = clamp(base - aTexCoord.y, 0.0, 1.0);
+            
+            vec3 R = mix(R_camTilt, R_flatTilt, fLocal);
+            vec3 U = mix(U_camTilt, U_flatTilt, fLocal);
+            
+
+            vec3 pos = aPosition
+                     + R * (aTexCoord.x - 0.5)
+                     + U * (aTexCoord.y - 0.5);
+                     
+
+            gl_Position = uProjectionView * vec4(pos, 1.0);
     }
 `;
 
-// In setupParticleShaders(), modify the fragment shader:
 const particleFShaderCode = `
-    precision mediump float;
-    varying vec4 vColor;
-    varying vec2 vUV;
-    varying float vLifetime;
-    uniform sampler2D uSmokeTexture;
-    uniform float uTime;
+precision mediump float;
 
-    void main() {
-    vec4 texColor = texture2D(uSmokeTexture, vUV);
-    float alpha = texColor.a * vColor.a;
-    
-    // Simple fade based on lifetime (already normalized and clamped)
-    float finalAlpha = alpha * (1.0 - vLifetime);
-    
-    gl_FragColor = vec4(texColor.rgb, finalAlpha);
+varying vec4  vColor;
+varying vec2  vUV;
+varying float vLifetime;
+
+uniform sampler2D uSmokeTexture;
+
+/* texture is 256×256 — half-texel keeps sampling off the 1-pixel halo */
+const float EDGE = 0.5 / 256.0;      // 0.00195
+
+void main () {
+
+    /* ---------------- keep lookup safely inside the blue disk ----- */
+    vec2 uv = clamp(vUV, vec2(EDGE), vec2(1.0 - EDGE));
+
+    vec4 tex = texture2D(uSmokeTexture, uv);
+
+    /* optional – fade the very edge of the sprite to remove hard ring */
+    float rim = smoothstep(0.96, 0.99, max(uv.x, uv.y));
+    tex.a *= (1.0 - rim);
+
+    /* ---------- colour: leave RGB straight, modulate only alpha ---- */
+    vec3  rgb   = tex.rgb;                      // stays blue
+    float alpha = tex.a * vColor.a              // per-particle α
+                  * (1.0 - vLifetime);          // lifetime fade
+
+    if (alpha < 0.01) discard;                  // cheaper than dark draw
+    gl_FragColor = vec4(rgb, alpha);
 }
 `;
 
@@ -726,7 +818,6 @@ const particleFShaderCode = `
         return null;
     }
 
-    // Store program in global scope
     window.particleProgram = {
         program: particleProgram,
         attributes: {
@@ -735,7 +826,9 @@ const particleFShaderCode = `
             size: gl.getAttribLocation(particleProgram, 'aSize'),
             lifetime: gl.getAttribLocation(particleProgram, 'aLifetime'),
             velocity: gl.getAttribLocation(particleProgram, 'aVelocity'),
-            texCoord: gl.getAttribLocation(particleProgram, 'aTexCoord')
+            texCoord: gl.getAttribLocation(particleProgram, 'aTexCoord'),
+            flatten: gl.getAttribLocation(particleProgram, 'aFlatten'),
+            tilt : gl.getAttribLocation(particleProgram, 'aTilt')
         },
         uniforms: {
             projectionView: gl.getUniformLocation(particleProgram, 'uProjectionView'),
@@ -744,14 +837,13 @@ const particleFShaderCode = `
             smokeTexture: gl.getUniformLocation(particleProgram, 'uSmokeTexture'),
             liquidTexture: gl.getUniformLocation(particleProgram, 'uLiquidTexture')
         },
-        buffers: {} // Add this to store buffer objects
+        buffers: {} 
     };
 
-    // Create buffers for each attribute
+
     const attributes = window.particleProgram.attributes;
     const buffers = window.particleProgram.buffers;
 
-    // Create position buffer
     buffers.position = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
@@ -761,7 +853,6 @@ const particleFShaderCode = `
         -1, 1, 0,     0, 1
     ]), gl.STATIC_DRAW);
 
-    // Create color buffer
     buffers.color = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
@@ -771,7 +862,6 @@ const particleFShaderCode = `
         1, 1, 1, 1
     ]), gl.STATIC_DRAW);
 
-    // Create size buffer
     buffers.size = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffers.size);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
@@ -781,7 +871,6 @@ const particleFShaderCode = `
         1, 1
     ]), gl.STATIC_DRAW);
 
-    // Create lifetime buffer
     buffers.lifetime = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffers.lifetime);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
@@ -798,7 +887,7 @@ const particleFShaderCode = `
         0, 0, 0
     ]), gl.STATIC_DRAW);
 
-    // Create texCoord buffer
+
     buffers.texCoord = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffers.texCoord);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
@@ -808,7 +897,15 @@ const particleFShaderCode = `
         0, 1
     ]), gl.STATIC_DRAW);
 
-    // Create index buffer
+    buffers.flatten = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.flatten);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0, 0]), gl.DYNAMIC_DRAW);
+
+    buffers.tilt    = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.tilt);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,0,0,0]), gl.DYNAMIC_DRAW);
+
+  
     buffers.indices = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array([
@@ -816,7 +913,6 @@ const particleFShaderCode = `
         0, 2, 3
     ]), gl.STATIC_DRAW);
 
-    // Enable attributes and set up attribute pointers
     gl.useProgram(particleProgram);
     gl.enableVertexAttribArray(window.particleProgram.attributes.lifetime);
     
@@ -856,107 +952,251 @@ const particleFShaderCode = `
         gl.vertexAttribPointer(attributes.texCoord, 2, gl.FLOAT, false, 0, 0);
     }
 
-    // Switch back to the main shader program
+    if (attributes.flatten !== -1) {
+        gl.enableVertexAttribArray(attributes.flatten);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.flatten);
+        gl.vertexAttribPointer(attributes.flatten, 1, gl.FLOAT, false, 0, 0);
+    }
+    if (attributes.tilt !== -1) {
+        gl.enableVertexAttribArray(attributes.tilt);
+        gl.vertexAttribPointer(attributes.tilt, 1, gl.FLOAT, false, 0, 0);
+    }
     gl.useProgram(shaderProgram);
 
     return window.particleProgram;
 }
 
 class Particle {
-    constructor(position, type) {
-        this.position = vec3.clone(position);
-        this.type = type;
-        this.startTime = performance.now();
-        this.age = 0;
-        
-        const config = PARTICLE_CONFIGS[type];
-        this.lifetime = config.lifetime;
-        
-        // Initial velocity with burst effect
-        this.velocity = vec3.fromValues(
-            config.initialVelocityRange.x[0] + Math.random() * (config.initialVelocityRange.x[1] - config.initialVelocityRange.x[0]),
-            config.initialVelocityRange.y[0] + Math.random() * (config.initialVelocityRange.y[1] - config.initialVelocityRange.y[0]),
-            config.initialVelocityRange.z[0] + Math.random() * (config.initialVelocityRange.z[1] - config.initialVelocityRange.z[0])
-        );
-        
-        // Initial properties
-        this.size = config.startSize;
-        this.alpha = config.startOpacity;
-        this.color = vec3.fromValues(...config.startColor);
-        
-        // Additional physics properties
-        this.angularVelocity = Math.random() * Math.PI * 2;
-        this.phase = Math.random() * Math.PI * 2; // Random starting phase for swirl
+    constructor(pos, type) {
+        this.position = vec3.clone(pos);
+        this.type     = type;
+        this.startTime= performance.now();
+        this.age      = 0;
+        this.hasSpread = false;
+        this.origin    = null;
+
+        const cfg = PARTICLE_CONFIGS[type];
+        this.lifetime = cfg.lifetime;
+
+        // keeping velocity pre-set by emitter, otherwise random
+        if (type === PARTICLE_TYPES.SMOKE) {
+            this.velocity = vec3.fromValues(
+                cfg.initialVelocityRange.x[0] + Math.random() * (cfg.initialVelocityRange.x[1] - cfg.initialVelocityRange.x[0]),
+                cfg.initialVelocityRange.y[0] + Math.random() * (cfg.initialVelocityRange.y[1] - cfg.initialVelocityRange.y[0]),
+                cfg.initialVelocityRange.z[0] + Math.random() * (cfg.initialVelocityRange.z[1] - cfg.initialVelocityRange.z[0])
+            );
+        } else {
+            this.velocity = vec3.clone(this.velocity || vec3.create()); 
+        }
+
+        this.size  = cfg.startSize;
+        this.alpha = cfg.startOpacity;
+        this.color = vec3.fromValues(...cfg.startColor ?? [0.3,0.6,1.0]);
+        this.flatten = 0.0; // 0 = upright, 1 = flat on floor
+        this.groundHit = null; // time (ms) when bottom first touched floor
+        this.tilt = 15.0; 
+        this.heading   = null;
     }
 
-    // In Particle class, modify the update method
-// In Particle class, update the update method:
-// In Particle class, update the update method
 update(deltaTime) {
 
-    /* ----- age & physics forces (unchanged) ----- */
-    this.age = performance.now() - this.startTime;
-    const lifeT = Math.min(1, this.age / this.lifetime);
+    // common age / lifetime
+    this.age   = performance.now() - this.startTime;
+    const cfg  = PARTICLE_CONFIGS[this.type];
+    const lifeT = Math.min(1, this.age / this.lifetime);  
 
-    const cfg = PARTICLE_CONFIGS[this.type];
+    /* =====================================================================
+       LIQUID
+       ===================================================================== */
+       
+    if (this.type === PARTICLE_TYPES.LIQUID) {
 
-    // buoyancy + gravity
-    const accel = vec3.fromValues(
-        0,
-        cfg.physics.buoyancy * (1 - lifeT * lifeT) + cfg.physics.gravity,
-        0
-    );
+        // forces
+        // gravity acts only while droplet is airborne
+        if (this.position[1] > cfg.startSize * 0.6)
+            this.velocity[1] += cfg.physics.gravity * deltaTime;
 
-    // simple turbulence
-    this.velocity[0] += (Math.random() - 0.5) * cfg.turbulence.scale * deltaTime;
-    this.velocity[2] += (Math.random() - 0.5) * cfg.turbulence.scale * deltaTime;
-    vec3.scaleAndAdd(this.velocity, this.velocity, accel, deltaTime);
-    vec3.scale(this.velocity, this.velocity,
-               Math.pow(cfg.physics.drag, deltaTime * 60));
+        // horizontal drag (sticky)
+        this.velocity[0] *= Math.pow(cfg.physics.drag, 60 * deltaTime);
+        this.velocity[2] *= Math.pow(cfg.physics.drag, 60 * deltaTime);
 
-    /* ----- motion & collision ----- */
-    const nextPos = vec3.scaleAndAdd(vec3.create(), this.position,
-                                     this.velocity, deltaTime);
+        // integrate
+        const trial = vec3.scaleAndAdd(vec3.create(),
+                                       this.position,
+                                       this.velocity,
+                                       deltaTime);
 
-    const hit = checkParticleCollision(this, nextPos);
-    if (hit.hit) {
-        /* place particle exactly on the surface */
-        vec3.copy(this.position, hit.point);
+        // clamp to floor so it doesn’t dip below and reappear
+        let justClamped = false;
+        if (trial[1] < this.size * 0.1) {
+            trial[1]         = this.size * 0.1;
+            this.velocity[1] = 0;                     // kill vertical motion
+            justClamped = true;
+        }
 
-        /* reflect only the outward component, keep tangential velocity */
-        const vn = vec3.dot(this.velocity, hit.normal);
-        if (vn < 0) vec3.scaleAndAdd(this.velocity, this.velocity,
-                                     hit.normal, -vn);   // kill inward part
-        vec3.scale(this.velocity, this.velocity, 0.5);    // your damping factor
-    } else {
-        vec3.copy(this.position, nextPos);
+        // collision with walls
+        const col = checkParticleCollision(this, trial);
+        if (col.hit) {
+            vec3.copy(this.position, col.point);      // sit on surface
+
+            const vn = vec3.dot(this.velocity, col.normal);
+            if (vn < 0) {
+                if (col.normal[1] > 0.5) {            // FLOOR  => tiny rebound
+                    this.position[1] = this.size * 0.5;
+                } else {                              // WALL / CEILING => slide
+                    vec3.scaleAndAdd(this.velocity,
+                                     this.velocity,
+                                     col.normal,
+                                     -vn);           // remove inward part
+                }
+            }
+
+            // slide friction & quicker fade while hugging geometry
+            this.velocity[0] *= 0.80;
+            this.velocity[2] *= 0.82;
+            this.alpha       *= 0.83;
+
+            /* radial shove executed exactly once, on first clamp-to-floor */
+            if (justClamped && !this.hasSpread) {
+                this.hasSpread = true;
+            
+                /* random direction on the X-Z plane -------------------------- */
+                const ang = Math.random() * 6.2831853;   // 0‥2π
+                const speed = 0.4 + Math.random() * 0.6; // 0.4 – 1.0 m s⁻¹
+            
+                this.velocity[0] = Math.cos(ang) * speed;
+                this.velocity[2] = Math.sin(ang) * speed;
+            
+                /* remember it (optional, if you want to re-use later) */
+                this.heading = [this.velocity[0], this.velocity[2]];
+            }
+
+        } else {
+            vec3.copy(this.position, trial);
+        }
+
+        // 4. visuals
+        this.size  = cfg.startSize + (cfg.endSize - cfg.startSize) * lifeT;
+        this.alpha = cfg.startOpacity * (1 - lifeT * lifeT);
+        // simple lerp of start→end colour
+        this.color = vec3.fromValues(0.25, 0.55, 1.0); // Fixed blue color
+        const floorY = this.size * 0.5;
+        if (this.position[1] < floorY) this.position[1] = floorY;
+
+        // record first floor contact & grow flatten
+        const radius = this.size * 0.8;
+        const distToFloor = this.position[1] - radius;         // how far bottom is above y=0
+
+        const startRange = this.size * 1.2;                    // begin easing within 2×height
+        let target = 0.1;
+        if (distToFloor < startRange) {
+            // map: at contact (dist=0) → 1, above range → 0, clamped
+            target = 1.0 - Math.max(distToFloor, 0.0) / startRange;
+        }
+
+        // exponentially approach the target for smoothness
+        const smoothing = 8.0;                                 // higher value => snappier
+        this.flatten += (target - this.flatten) * (1 - Math.exp(-smoothing * deltaTime));
+        if (this.flatten >= 0.95) {      
+            this.flatten = 1.0;             
+        
+            
+            this.velocity[0] *= cfg.physics.drag;
+            this.velocity[2] *= cfg.physics.drag;
+        
+            const speed2 = this.velocity[0]*this.velocity[0] +
+                           this.velocity[2]*this.velocity[2];
+            if (speed2 < cfg.physics.vCutoff*cfg.physics.vCutoff) {
+                this.velocity[0] = 0;
+                this.velocity[2] = 0;
+            }
+        }
+
     }
 
-    /* ----- visual properties ----- */
-    this.size  = cfg.startSize +
-                 (cfg.endSize - cfg.startSize) * (1 - (1 - lifeT) ** 2);
-    this.alpha = lifeT > 0.7
-               ? cfg.startOpacity * (1 - (lifeT - 0.7) / 0.3)
-               : cfg.startOpacity;
+    /* =====================================================================
+       SMOKE
+       ===================================================================== */
 
-    return this.age < this.lifetime && this.alpha > 0.01;
-};
+    else {
+        const accel = vec3.fromValues(
+            0,
+            cfg.physics.buoyancy * (1 - lifeT * lifeT) +
+            cfg.physics.gravity,
+            0
+        );
+
+        vec3.scaleAndAdd(this.velocity, this.velocity, accel, deltaTime);
+        vec3.scale(this.velocity, this.velocity,
+                   Math.pow(cfg.physics.drag, deltaTime * 60));
+
+        const trial = vec3.scaleAndAdd(vec3.create(),
+                                       this.position,
+                                       this.velocity,
+                                       deltaTime);
+        const col = checkParticleCollision(this, trial);
+
+        if (col.hit) {
+            vec3.copy(this.position, col.point);
+            const vn = vec3.dot(this.velocity, col.normal);
+            if (vn < 0) vec3.scaleAndAdd(this.velocity,
+                                         this.velocity,
+                                         col.normal,
+                                         -vn);
+            vec3.scale(this.velocity, this.velocity, 0.5);  // damp bounce
+        } else {
+            vec3.copy(this.position, trial);
+        }
+
+        // visuals
+        this.size = cfg.startSize +
+                    (cfg.endSize - cfg.startSize) *
+                    (1 - (1 - lifeT) ** 2);
+        this.alpha = (lifeT > 0.7)
+                   ? cfg.startOpacity * (1 - (lifeT - 0.7) / 0.3)
+                   : cfg.startOpacity;
+        const wobbleAmp = 0.10;                    
+        const wobbleFreq = 3.0;                    
+        this.tilt = wobbleAmp * Math.sin(performance.now() * 0.001 * wobbleFreq);
+        this.flatten = 0.0; 
+    }
+
+    /* ---------------------------------------------------------------------*/
+    return (this.age < this.lifetime) && (this.alpha > 0.01);
+}
+
 }
 
 class ParticleSystem {
     constructor() {
-        this.particles = [];
+        // Separate arrays for different particle types
+        this.particles = {
+            [PARTICLE_TYPES.SMOKE]: [],
+            [PARTICLE_TYPES.LIQUID]: []
+        };
+        this.currentType = null;
+        this.lastUpdateTime = 0;
+    }
+
+    reset(type) {
+        // Only reset the specified type if provided
+        if (type) {
+            this.particles[type] = [];
+        } else {
+            // Reset all types if no type specified
+            this.particles[PARTICLE_TYPES.SMOKE] = [];
+            this.particles[PARTICLE_TYPES.LIQUID] = [];
+        }
     }
 
     emitSmoke(position) {
         const config = PARTICLE_CONFIGS[PARTICLE_TYPES.SMOKE];
         const particleCount = config.maxParticles;
         
-        // Emit in a more natural cone pattern
         for (let i = 0; i < particleCount; i++) {
             const angle = (i / particleCount) * Math.PI * 2;
-            const radius = Math.random() * 0.1; // Tighter initial spread
-            const heightVariation = Math.random() * 0.05; // Small vertical variation
+            const radius = Math.random() * 0.1;
+            const heightVariation = Math.random() * 0.2;
             
             const offset = vec3.fromValues(
                 Math.cos(angle) * radius,
@@ -966,130 +1206,161 @@ class ParticleSystem {
             
             const emissionPos = vec3.add(vec3.create(), position, offset);
             const particle = new Particle(emissionPos, PARTICLE_TYPES.SMOKE);
-            
-            // Add random initial rotation
+
+            particle.tilt = (Math.random() - 0.5) * 0.275;
             particle.angularVelocity = (Math.random() - 0.5) * Math.PI;
-            particle.phase = Math.random() * Math.PI * 2;
+            particle.phase = Math.random() * Math.PI * 2.5;
             
-            this.particles.push(particle);
+            this.particles[PARTICLE_TYPES.SMOKE].push(particle);
         }
     }
 
+    emitLiquid(origin) {
+        const cfg = PARTICLE_CONFIGS[PARTICLE_TYPES.LIQUID];
+        const n   = cfg.maxParticles;
+    
+        for (let i = 0; i < n; ++i) {
+            /* random direction in a disk */
+            const a = Math.random() * 2 * Math.PI;
+            const r = Math.sqrt(Math.random());
+            const dir = vec3.fromValues(Math.cos(a), 0, Math.sin(a));
+    
+            /* spawn position: tiny offset so we don’t clip floor */
+             const pos = vec3.scaleAndAdd(vec3.create(), origin, dir, 0.02);
+             pos[1] += 0.02;
+            //const pos = vec3.clone(origin);
+
+            const particle = new Particle(pos, PARTICLE_TYPES.LIQUID);
+            particle.origin = vec3.clone(origin);
+
+            particle.tilt = (Math.random() < 0.4)             // 40 % of droplets
+            ? (Math.random() - 0.5) * 0.35        // −20° … +10° in radians
+            : 0.0;                                 
+    
+            /* outward + upward velocity */
+            const speed = cfg.initialVelocityRange.rMin +
+                          Math.random() * (cfg.initialVelocityRange.rMax -
+                                           cfg.initialVelocityRange.rMin);
+            const vy    = cfg.initialVelocityRange.yMin +
+                          Math.random() * (cfg.initialVelocityRange.yMax -
+                                           cfg.initialVelocityRange.yMin);
+    
+            vec3.scale(particle.velocity, dir, speed);
+            particle.velocity[1] = vy;
+    
+            this.particles[PARTICLE_TYPES.LIQUID].push(particle);
+        }
+    }
+
+
     update() {
         const currentTime = performance.now();
-        // Ensure we have a valid last update time
         if (!this.lastUpdateTime) {
             this.lastUpdateTime = currentTime;
             return;
         }
         
-        // Calculate delta time in seconds with higher precision
-        const deltaTime = Math.min((currentTime - this.lastUpdateTime) / 1000.0, 0.1); // Cap at 100ms to avoid large jumps
+        const deltaTime = Math.min((currentTime - this.lastUpdateTime) / 1000.0, 0.1);
         this.lastUpdateTime = currentTime;
     
-        // Update and filter out dead particles
-        this.particles = this.particles.filter(particle => particle.update(deltaTime));
+        // Updating each type of particle
+        Object.keys(this.particles).forEach(type => {
+            this.particles[type] = this.particles[type].filter(particle => 
+                particle.update(deltaTime));
+        });
     }
 
+    // In ParticleSystem class, modify the render method:
     render() {
-          if (this.particles.length === 0 || !window.DEBUG.SHOW_PARTICLES) {
-            // console.log("Skipping particle render:", {
-            //     particleCount: this.particles.length,
-            //     debugEnabled: window.DEBUG.SHOW_PARTICLES
-            // });
+        if (!window.DEBUG.SHOW_PARTICLES) return;
+    
+        gl.useProgram(window.particleProgram.program);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.depthMask(false);
+    
+        const all = [
+            ...this.particles[PARTICLE_TYPES.SMOKE],
+            ...this.particles[PARTICLE_TYPES.LIQUID]
+        ].sort((a, b) =>
+            vec3.squaredDistance(b.position, Eye) -
+            vec3.squaredDistance(a.position, Eye));
+    
+        if (!all.length) {
+            gl.depthMask(true);
+            gl.disable(gl.BLEND);
+            gl.useProgram(shaderProgram);
             return;
         }
     
-        //console.log("Rendering particles:", this.particles.length); // Debug log
+        gl.uniformMatrix4fv(window.particleProgram.uniforms.projectionView, false, hpvMatrix);
+        gl.uniform3fv(window.particleProgram.uniforms.eyePosition, Eye);
+        gl.uniform1f(window.particleProgram.uniforms.time, performance.now() * 0.001);
     
-        gl.useProgram(window.particleProgram.program);
-
-        // Enable depth testing but don't write to depth buffer
-        // gl.enable(gl.DEPTH_TEST);
-        // gl.depthFunc(gl.LEQUAL)
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        
-        gl.depthMask(false);
-        
-        // Enable blending for transparency
-        
-        
-        this.particles.sort((a, b) => {
-            const distA = vec3.squaredDistance(a.position, Eye);
-            const distB = vec3.squaredDistance(b.position, Eye);
-            return distB - distA;  // Sort back-to-front
-        });
-
-        // Update uniforms
-        gl.uniformMatrix4fv(
-            window.particleProgram.uniforms.projectionView,
-            false,
-            hpvMatrix
-        );
-        gl.uniform3fv(
-            window.particleProgram.uniforms.eyePosition,
-            Eye
-        );
-        gl.uniform1f(
-            window.particleProgram.uniforms.time,
-            (performance.now() % 15000) / 15000.0  // Creates a 0-1 cycle every second
-        );
-
-        
-    
-        // Bind smoke texture
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, window.particleTextures.smoke);
-        gl.uniform1i(window.particleProgram.uniforms.smokeTexture, 0);
-    
-        // Bind buffers
         gl.bindBuffer(gl.ARRAY_BUFFER, window.particleProgram.buffers.position);
         gl.vertexAttribPointer(window.particleProgram.attributes.position, 3, gl.FLOAT, false, 0, 0);
-    
         gl.bindBuffer(gl.ARRAY_BUFFER, window.particleProgram.buffers.texCoord);
         gl.vertexAttribPointer(window.particleProgram.attributes.texCoord, 2, gl.FLOAT, false, 0, 0);
     
-        // Draw each particle
-        this.particles.forEach(particle => {
-
-            let normalizedLifetime = Math.min(1.0, Math.max(0.0, particle.age / particle.lifetime));
-            normalizedLifetime = Math.round(normalizedLifetime * 1000) / 1000;
-
-            const lifetimeArray = new Float32Array([
-                normalizedLifetime,
-                normalizedLifetime,
-                normalizedLifetime,
-                normalizedLifetime
-            ]);
-
-            // console.log("Particle lifetime:", particle.lifetime, "Normalized:", normalizedLifetime); // Debug log
-            // Set particle-specific attributes
+        let currentTex = null;                        
+        for (const p of all) {
+            /* bind proper atlas only when it changes */
+            const needed = (p.type === PARTICLE_TYPES.LIQUID)
+                         ? window.particleTextures.liquid
+                         : window.particleTextures.smoke;
+            if (needed !== currentTex) {
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, needed);
+                currentTex = needed;
+            }
+    
+            const life = Math.min(1, p.age / p.lifetime);
+            const lifeArr = new Float32Array([life, life, life, life]);
             gl.bindBuffer(gl.ARRAY_BUFFER, window.particleProgram.buffers.lifetime);
-            gl.bufferData(gl.ARRAY_BUFFER, lifetimeArray, gl.DYNAMIC_DRAW);
+            gl.bufferData(gl.ARRAY_BUFFER, lifeArr, gl.DYNAMIC_DRAW);
             gl.vertexAttribPointer(window.particleProgram.attributes.lifetime, 1, gl.FLOAT, false, 0, 0);
 
-            gl.vertexAttrib1f(window.particleProgram.attributes.lifetime, normalizedLifetime);
-            gl.vertexAttrib2f(window.particleProgram.attributes.size, particle.size, particle.size);
-            gl.vertexAttrib4f(window.particleProgram.attributes.color, particle.color[0], particle.color[1], particle.color[2], particle.alpha);
+            if (window.particleProgram.attributes.flatten !== -1) {
+                const f = p.flatten;
+                gl.bindBuffer(gl.ARRAY_BUFFER, window.particleProgram.buffers.flatten);
+                gl.bufferData(gl.ARRAY_BUFFER,
+                    new Float32Array([f, f, f, f]), gl.DYNAMIC_DRAW);
+                gl.vertexAttribPointer(
+                    window.particleProgram.attributes.flatten, 1, gl.FLOAT, false, 0, 0
+                );
+            }
+
+            if (window.particleProgram.attributes.tilt !== -1) {
+                const ang = (typeof p.tilt === 'number') ? p.tilt : 0.0;
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, window.particleProgram.buffers.tilt);
+                gl.bufferData(gl.ARRAY_BUFFER,
+                    new Float32Array([ang, ang, ang, ang]), gl.DYNAMIC_DRAW);
+                gl.vertexAttribPointer(
+                    window.particleProgram.attributes.tilt, 1, gl.FLOAT, false, 0, 0);
+            }
             
-            // Update position buffer with particle position
+            /* per-sprite constant attributes */
+            gl.vertexAttrib2f(window.particleProgram.attributes.size, p.size, p.size);
+            gl.vertexAttrib4f(window.particleProgram.attributes.color, p.color[0], p.color[1], p.color[2], p.alpha);
+    
+            /* update quad centre positions */
+            const s = p.size;
+            const pos = new Float32Array([
+            p.position[0]-s, p.position[1]-s, p.position[2],
+            p.position[0]+s, p.position[1]-s, p.position[2],
+            p.position[0]+s, p.position[1]+s, p.position[2],
+            p.position[0]-s, p.position[1]+s, p.position[2]
+        ]);
             gl.bindBuffer(gl.ARRAY_BUFFER, window.particleProgram.buffers.position);
-            const positions = new Float32Array([
-                particle.position[0] - particle.size, particle.position[1] - particle.size, particle.position[2],
-                particle.position[0] + particle.size, particle.position[1] - particle.size, particle.position[2],
-                particle.position[0] + particle.size, particle.position[1] + particle.size, particle.position[2],
-                particle.position[0] - particle.size, particle.position[1] + particle.size, particle.position[2]
-            ]);
-            gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
-    
-            // Draw particle
+            gl.bufferData(gl.ARRAY_BUFFER, pos, gl.DYNAMIC_DRAW);
+
+        /* draw */
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, window.particleProgram.buffers.indices);
             gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
-        });
+    }
     
-        // Reset state
         gl.depthMask(true);
-        gl.depthFunc(gl.LESS); // Reset to default depth function
         gl.disable(gl.BLEND);
         gl.useProgram(shaderProgram);
     }
@@ -1126,6 +1397,7 @@ function createProjectile() {
         isResting: false,
         createTime: performance.now(),
         lastUpdateTime: performance.now(),
+        effectType: currentProjectileType,
         // Define cube vertices
         vertices: new Float32Array([
             // Front face
@@ -1159,6 +1431,23 @@ function createProjectile() {
             -PROJECTILE.SIZE,  PROJECTILE.SIZE,  PROJECTILE.SIZE,
             -PROJECTILE.SIZE,  PROJECTILE.SIZE, -PROJECTILE.SIZE
         ]),
+
+        uvs: new Float32Array([
+            // Front face
+            0.0, 0.0,  1.0, 0.0,  1.0, 1.0,  0.0, 1.0,
+            // Back face
+            0.0, 0.0,  1.0, 0.0,  1.0, 1.0,  0.0, 1.0,
+            // Top face
+            0.0, 0.0,  1.0, 0.0,  1.0, 1.0,  0.0, 1.0,
+            // Bottom face
+            0.0, 0.0,  1.0, 0.0,  1.0, 1.0,  0.0, 1.0,
+            // Right face
+            0.0, 0.0,  1.0, 0.0,  1.0, 1.0,  0.0, 1.0,
+            // Left face
+            0.0, 0.0,  1.0, 0.0,  1.0, 1.0,  0.0, 1.0
+        ]),
+
+
         // Define indices for the cube
         indices: new Uint16Array([
             0,  1,  2,    0,  2,  3,    // Front
@@ -1170,14 +1459,40 @@ function createProjectile() {
         ])
     };
 
+    console.log("Created projectile with effect type:", projectile.effectType);
+    // Create WebGL buffers
     // Create WebGL buffers
     projectile.vertexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, projectile.vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, projectile.vertices, gl.STATIC_DRAW);
 
+    // Create UV buffer
+    projectile.uvBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, projectile.uvBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, projectile.uvs, gl.STATIC_DRAW);
+
     projectile.indexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, projectile.indexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, projectile.indices, gl.STATIC_DRAW);
+
+    // Create and load texture
+    projectile.texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, projectile.texture);
+
+    // Set up temporary texture while loading
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+        new Uint8Array([255, 255, 255, 255]));
+
+    const image = new Image();
+    image.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, projectile.texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    };
+    image.src = PROJECTILE.TEXTURE_URL;
 
     projectiles.push(projectile);
 }
@@ -1290,11 +1605,12 @@ function handleCollision(projectile, collision) {
     
     // Ground collision with low speed - come to rest
     // In handleCollision function
+// In handleCollision function, modify the particle emission part:
+// In handleCollision function
 if (!collision.isWall && 
     projectile.position[1] <= PROJECTILE.SIZE + 0.01 && 
     speed < PROJECTILE.MIN_SPEED) {
     
-    console.log("Projectile coming to rest, emitting particles");
     projectile.isResting = true;
     projectile.velocity = vec3.fromValues(0, 0, 0);
     projectile.position[1] = PROJECTILE.SIZE;
@@ -1305,18 +1621,13 @@ if (!collision.isWall &&
         return;
     }
     
-    // More particles with bigger spread and size
-    const config = PARTICLE_CONFIGS[PARTICLE_TYPES.SMOKE];
-    const particleCount = config.maxParticles;
-    console.log(`Attempting to emit ${particleCount} particles`);
-    for (let i = 0; i < particleCount; i++) {
-        const randomOffset = vec3.fromValues(
-            (Math.random() - 0.5) * 0.2,
-            0.1,
-            (Math.random() - 0.5) * 0.2
-        );
-        const emissionPos = vec3.add(vec3.create(), projectile.position, randomOffset);
-        particleSystem.emitSmoke(emissionPos);
+    const basePos = vec3.clone(projectile.position);
+    
+    // Emit particles based on current projectile type
+    if (projectile.effectType === PARTICLE_TYPES.SMOKE) {
+        particleSystem.emitSmoke(basePos);
+    } else {
+        particleSystem.emitLiquid(basePos);
     }
 }
 
@@ -1401,8 +1712,8 @@ function loadParticleTextures() {
             // Set initial texture parameters for loading
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); // Changed from CLAMP_TO_EDGE
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); // Changed from CLAMP_TO_EDGE
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             
             gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
             gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -1424,8 +1735,8 @@ function loadParticleTextures() {
                 // Set texture parameters
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 
                 resolve(texture);
             };
@@ -1477,27 +1788,17 @@ function updateProjectiles() {
         // Check if projectile should come to rest
         const speed = vec3.length(projectile.velocity);
         if (speed < PROJECTILE.MIN_SPEED && projectile.position[1] <= PROJECTILE.SIZE + 0.01) {
-            // Mark as resting and emit particles
             projectile.isResting = true;
-            projectile.velocity = vec3.fromValues(0, 0, 0);
+            vec3.set(projectile.velocity, 0, 0, 0);
             projectile.position[1] = PROJECTILE.SIZE;
-            
-            console.log("Projectile coming to rest naturally");
+        
             playSound('collision_projectile');
-            
-            // Emit particles for resting projectile
+        
             if (particleSystem) {
-                const config = PARTICLE_CONFIGS[PARTICLE_TYPES.SMOKE];
-                const particleCount = config.maxParticles;
-                for (let j = 0; j < particleCount; j++) {
-                    const randomOffset = vec3.fromValues(
-                        (Math.random() - 0.5) * 0.2,
-                        0.1,
-                        (Math.random() - 0.5) * 0.2
-                    );
-                    const emissionPos = vec3.add(vec3.create(), projectile.position, randomOffset);
-                    particleSystem.emitSmoke(emissionPos);
-                }
+                if (projectile.effectType === PARTICLE_TYPES.LIQUID)
+                    particleSystem.emitLiquid(projectile.position);
+                else
+                    particleSystem.emitSmoke(projectile.position);
             }
             continue;
         }
@@ -2693,12 +2994,8 @@ function displayPerfStats() {
     
     statsElement.innerHTML = `
         Mode: ${modeName}
-        FPS: ${Math.round(perfStats.fps)}
-        Frame Time: ${perfStats.frameTime.toFixed(2)}ms (${perfStats.frameCount < 10 ? 'warming up' : 'avg'})
         Triangles: ${perfStats.trianglesRendered}
         Cells: ${perfStats.roomsVisible/2}
-        Spheres: ${perfStats.spheresVisible}
-        Triangles: ${perfStats.triangleSetsVisible}
     `;
 }
 
@@ -2844,63 +3141,7 @@ function loadTexture(whichModel, currModel, textureFile) {
 // read models in, load them into webgl buffers
 function loadModels() {
 
-    
-    // make a sphere with radius 1 at the origin, with numLongSteps longitudes. 
-    // Returns verts, tris and normals.
-    function makeSphere(numLongSteps) {
-        
-        try {
-            if (numLongSteps % 2 != 0)
-                throw "in makeSphere: uneven number of longitude steps!";
-            else if (numLongSteps < 4)
-                throw "in makeSphere: number of longitude steps too small!";
-            else { // good number longitude steps
-            
-                // make vertices, normals and uvs -- repeat longitude seam
-                const INVPI = 1/Math.PI, TWOPI = Math.PI+Math.PI, INV2PI = 1/TWOPI, epsilon=0.001*Math.PI;
-                var sphereVertices = [0,-1,0]; // vertices to return, init to south pole
-                var sphereUvs = [0.5,0]; // uvs to return, bottom texture row collapsed to one texel
-                var angleIncr = TWOPI / numLongSteps; // angular increment 
-                var latLimitAngle = angleIncr * (Math.floor(numLongSteps*0.25)-1); // start/end lat angle
-                var latRadius, latY, latV; // radius, Y and texture V at current latitude
-                for (var latAngle=-latLimitAngle; latAngle<=latLimitAngle+epsilon; latAngle+=angleIncr) {
-                    latRadius = Math.cos(latAngle); // radius of current latitude
-                    latY = Math.sin(latAngle); // height at current latitude
-                    latV = latAngle*INVPI + 0.5; // texture v = (latAngle + 0.5*PI) / PI
-                    for (var longAngle=0; longAngle<=TWOPI+epsilon; longAngle+=angleIncr) { // for each long
-                        sphereVertices.push(-latRadius*Math.sin(longAngle),latY,latRadius*Math.cos(longAngle));
-                        sphereUvs.push(longAngle*INV2PI,latV); // texture u = (longAngle/2PI)
-                    } // end for each longitude
-                } // end for each latitude
-                sphereVertices.push(0,1,0); // add north pole
-                sphereUvs.push(0.5,1); // top texture row collapsed to one texel
-                var sphereNormals = sphereVertices.slice(); // for this sphere, vertices = normals; return these
 
-                // make triangles, first poles then middle latitudes
-                var sphereTriangles = []; // triangles to return
-                var numVertices = Math.floor(sphereVertices.length/3); // number of vertices in sphere
-                for (var whichLong=1; whichLong<=numLongSteps; whichLong++) { // poles
-                    sphereTriangles.push(0,whichLong,whichLong+1);
-                    sphereTriangles.push(numVertices-1,numVertices-whichLong-1,numVertices-whichLong-2);
-                } // end for each long
-                var llVertex; // lower left vertex in the current quad
-                for (var whichLat=0; whichLat<(numLongSteps/2 - 2); whichLat++) { // middle lats
-                    for (var whichLong=0; whichLong<numLongSteps; whichLong++) {
-                        llVertex = whichLat*(numLongSteps+1) + whichLong + 1;
-                        sphereTriangles.push(llVertex,llVertex+numLongSteps+1,llVertex+numLongSteps+2);
-                        sphereTriangles.push(llVertex,llVertex+numLongSteps+2,llVertex+1);
-                    } // end for each longitude
-                } // end for each latitude
-            } // end if good number longitude steps
-            return({vertices:sphereVertices, normals:sphereNormals, uvs:sphereUvs, triangles:sphereTriangles});
-        } // end try
-        
-        catch(e) {
-            console.log(e);
-        } // end catch
-    } // end make sphere
-    
-    //inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles"); // read in the triangle data
 
     try {
         if (inputTriangles == String.null)
@@ -2999,39 +3240,19 @@ function loadModels() {
                 } // end for each sphere
                 viewDelta = vec3.length(vec3.subtract(temp,maxCorner,minCorner)) / 100; // set global
 
-                // make one sphere instance that will be reused, with 32 longitude steps
-                var oneSphere = makeSphere(32);
-
-                // send the sphere vertex coords and normals to webGL
-                vertexBuffers.push(gl.createBuffer()); // init empty webgl sphere vertex coord buffer
-                gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[vertexBuffers.length-1]); // activate that buffer
-                gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(oneSphere.vertices),gl.STATIC_DRAW); // data in
-                normalBuffers.push(gl.createBuffer()); // init empty webgl sphere vertex normal buffer
-                gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[normalBuffers.length-1]); // activate that buffer
-                gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(oneSphere.normals),gl.STATIC_DRAW); // data in
-                uvBuffers.push(gl.createBuffer()); // init empty webgl sphere vertex uv buffer
-                gl.bindBuffer(gl.ARRAY_BUFFER,uvBuffers[uvBuffers.length-1]); // activate that buffer
-                gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(oneSphere.uvs),gl.STATIC_DRAW); // data in
-        
-                triSetSizes.push(oneSphere.triangles.length);
-
-                // send the triangle indices to webGL
-                triangleBuffers.push(gl.createBuffer()); // init empty triangle index buffer
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffers[triangleBuffers.length-1]); // activate that buffer
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(oneSphere.triangles),gl.STATIC_DRAW); // data in
-            } // end if sphere file loaded
-        } // end if triangle file loaded
-    } // end try 
+            } 
+        } 
+    } 
     
     catch(e) {
         console.log(e);
-    } // end catch
-} // end load models
+    } 
+}
 
 // setup the webGL shaders
 function setupShaders() {
     
-    // define vertex shader in essl using es6 template strings
+    
     var vShaderCode = `
         attribute vec3 aVertexPosition; // vertex position
         attribute vec3 aVertexNormal; // vertex normal
@@ -3060,7 +3281,7 @@ function setupShaders() {
         }
     `;
     
-    // define fragment shader in essl using es6 template strings
+    
     var fShaderCode = `
         precision mediump float; // set float to medium precision
 
@@ -3198,13 +3419,21 @@ const movement = {
 };
 
 function setupControls() {
-    // Key listeners remain the same
+    
     document.addEventListener('keydown', (e) => {
         switch(e.code) {
             case 'KeyW': keys.w = true; break;
             case 'KeyA': keys.a = true; break;
             case 'KeyS': keys.s = true; break;
             case 'KeyD': keys.d = true; break;
+            case 'KeyG':
+            currentProjectileType = PARTICLE_TYPES.SMOKE;
+            console.log("Switched to Smoke projectiles");
+            break;
+            case 'KeyH':
+            currentProjectileType = PARTICLE_TYPES.LIQUID;
+            console.log("Switched to Liquid projectiles");
+            break;
         }
     });
 
@@ -3312,7 +3541,7 @@ function updateMovement() {
             // Reset collision state when moving freely
             window.lastCollisionTime = 0;
         } else {
-            // Check if enough time has passed since last collision sound
+            // Checking here if enough time has passed since last collision sound
             const now = performance.now();
             if (!window.lastCollisionTime || (now - window.lastCollisionTime) > 2000) { // 500ms debounce
                 playSound('collision');
@@ -3334,6 +3563,7 @@ function renderModels() {
 
     const frameStartTime = performance.now();
     updateMovement();
+    displayProjectileType();
     updateProjectiles();
 
     // … (perfStats maintenance – unchanged) …
@@ -3386,17 +3616,25 @@ function renderModels() {
         mat4.identity(mMatrix);
         mat4.translate(mMatrix, mMatrix, p.position);
         mat4.multiply(hpvmMatrix, hpvMatrix, mMatrix);
-
+    
         gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix);
         gl.uniformMatrix4fv(pvmMatrixULoc, false, hpvmMatrix);
-        gl.uniform3fv(ambientULoc, [0.8, 0, 0]);
-        gl.uniform3fv(diffuseULoc, [1, 0, 0]);
+        gl.uniform3fv(ambientULoc, [0.8, 0.8, 0.8]);
+        gl.uniform3fv(diffuseULoc, [1.0, 1.0, 1.0]);
         gl.uniform3fv(specularULoc, [0.8, 0.8, 0.8]);
         gl.uniform1f(shininessULoc, 100.0);
-        gl.uniform1i(usingTextureULoc, false);
-
+        gl.uniform1i(usingTextureULoc, true);  // Enable texturing
+    
         gl.bindBuffer(gl.ARRAY_BUFFER, p.vertexBuffer);
         gl.vertexAttribPointer(vPosAttribLoc, 3, gl.FLOAT, false, 0, 0);
+    
+        gl.bindBuffer(gl.ARRAY_BUFFER, p.uvBuffer);
+        gl.vertexAttribPointer(vUVAttribLoc, 2, gl.FLOAT, false, 0, 0);
+    
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, p.texture);
+        gl.uniform1i(textureULoc, 0);
+    
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, p.indexBuffer);
         gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
     });
@@ -3500,7 +3738,6 @@ async function main() {
         }, 100);
     });
 
-    // Initialize particle system after textures are loaded
     window.particleSystem = new ParticleSystem();
     console.log("Particle system initialized with textures");
     
@@ -3512,11 +3749,9 @@ async function main() {
     loadModels();
     handSprite = createHandSprite();
     
-    // Start rendering
     renderModels();
 }
 
-// Change how we call main
 window.onload = () => {
     main().catch(console.error);
 };
